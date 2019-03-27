@@ -1,6 +1,8 @@
 # PML
 Practical Machine Learning Final Project
 
+A [reader-friendly HTML version](https://nayehi.github.io/PML/PML.html) of the HTML file for this project is available in the GitHub Repository.
+
 The below text reproduces the Project Description (https://www.coursera.org/learn/practical-machine-learning/peer/R43St/prediction-assignment-writeup).
 
 One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
