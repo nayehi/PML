@@ -1,5 +1,8 @@
 # PML
-Practical Machine Learning Final Project
+Practical Machine Learning Final Project: Prediction of Manner of Performance in Exercise
+
+The HTML file for this project was uploaded to gh-pages in this GitHub Repository. [View the Reader-
+Friendly HTML version](https://nayehi.github.io/PML/PML.html).
 
 The below text reproduces the Project Description (https://www.coursera.org/learn/practical-machine-learning/peer/R43St/prediction-assignment-writeup).
 
