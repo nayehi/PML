@@ -1,0 +1,199 @@
+---
+title: "Practical Machine Learning: Prediction of Manner of Performance in Exercise"
+author: "nayehi"
+date: "March 23, 2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+## Summary
+
+The goal of this project is to build a predictive model for how well a test subject performs barbell lifts in a study. This analysis shows it is possible to predict, with more than 99-percent accuracy, a subject's performance of the barbell lift based on a collection of data points from gyroscopes.
+
+## Introduction
+
+This work is undertaken as the final class project in the Practical Machine Learning course. This document is limited to less than 2,000 words and the number of figures is limited to 5. A [reader-friendly HTML version](https://nayehi.github.io/PML/PML.html) of this file is available in the GitHub Repository.
+
+**Background Information**
+
+With devices such as Jawbone Up, Nike FuelBand, and Fitbit, it is possible to collect a large amount of data about personal activity. In the study, six participants performed 10 repetitions of the Unilateral Dumbbell Biceps curl in each of the following five ways: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). Data was collected by accelerometers on the belts, forearms, and arms of the participants, as well as the dumbells. More information is available in the "Weight Lifting Exercises Dataset" section of the [Human Activity Recognition page](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har). The source of this dataset is [Qualitative Activity Recognition of Weight Lifting Exercises](http://web.archive.org/web/20161217164008/http://groupware.les.inf.puc-rio.br/work.jsf?p1=11201) by E. Velloso, A. Bulling, H. Gellersen, W. Ugulino, and H. Fuks. 
+
+## Setup
+
+The environment is set up to enable model building, testing and application.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(ggplot2)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(randomForest)
+set.seed(9999)
+```
+
+## Import Data
+
+The data is imported.
+
+```{r importdata}
+training <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",header = TRUE)
+testing <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",header = TRUE)
+```
+
+## Explore Data
+
+The variable to be predicted is "classe," which records which class of exercise was performed in each observation.
+
+The data is explored via dim(training), dim(testing), head(training),head(testing),str(training),str(testing), colnames(training), colnames (testing), summary(training), summary(testing). Due to document length limitations, the results will not be displayed. 
+
+This exploration revealed that the training data consists of 19622 observations across 160 variables, with the final variable being classe. The testing data consists of 20 observations across 160 variables, with the final variable being problem_id.
+
+## Clean Data
+
+The inclusion of columns unnecessary for the analysis could substantially increase variability, and so these columns are identified and removed. 
+
+### Identifying Variables for Removal
+
+#### Variables Not Affecting the Model
+
+Columns are identified for removal because the type of information they contain does not affect the model. 
+
+Column 1 (X) is the row identifier and is not needed. Column 2 (user_name) is not needed for this project. The timestamp columns (3,4,5) also can be removed, since this project does not involve measuring change over time. The window columns (6,7) refer to test specifications not related to performance measures and can be removed.
+
+#### NA/Blanks
+
+The str function revealed there are numerous NA values for many variables. These do not provide sufficient data to advise the model and will be removed. All columns for which NA/blanks account for more than 70 percent of the values are removed. 
+
+#### Near-Zero Variance
+
+Variables with near-zero variance are removed.
+
+### Removing Variables
+
+```{r remove_unwanted, echo=TRUE}
+TrainData1 <- training[,-c(1:7)]
+ColRemove <- which(colSums(is.na(TrainData1)|TrainData1=="")>(0.7*dim(TrainData1)[1]))
+TrainData2 <- TrainData1[,-ColRemove]
+NZV_cols <- nearZeroVar(TrainData2)
+if(length(NZV_cols) >0) {TrainData2 <- TrainData2[,-NZV_cols]}
+dim(TrainData2)
+cor_Train <- cor(TrainData2[,-53])
+```
+
+This cleanup has resulted in a better data set for achieving the project goal of predicting exercise type performed. The training data (TrainData2) now consists of the same 19622 observations across 53 variables. Correlations were viewed for the cleaned trainind data; due to length considerations, the results are not displayed.
+
+## Training and Validation Sets
+
+The training data is split into training (60%) and validation (40%) datasets. The validation data will be used to evaluate model fits during tuning; this cross-validation step, along with 5-fold cross-validation applied during model-testing, will be crucial to determine the models' accuracy rates.
+
+```{r makedata}
+inTrain <- createDataPartition(TrainData2$classe,p=0.6,list=FALSE)
+TrainData <- TrainData2[inTrain,]
+ValData <- TrainData2[-inTrain,]
+```
+
+Executing dim(TrainData) and dim(ValData) revealed TrainData consists of 11,776 observations while ValData consists of 7,746 observations. These are of sufficient size to train and validate models.
+
+## Model - Classification Tree
+
+A Classification Tree model is created with 5-fold cross-validation applied to assess how the model will perform when applied to additional data sets.
+
+```{r classtree}
+set.seed(9999)
+ctControl <- trainControl(method="cv",number=5)
+Mod_CT <- train(classe~.,data=TrainData,method="rpart",trControl=ctControl)
+fancyRpartPlot(Mod_CT$finalModel, main="Figure 1: Classification Tree")
+```
+
+The Classification Tree model is applied to the Validation Data and a confusion matrix is generated. 
+
+```{r testtree}
+trainpred_CT <- predict(Mod_CT,newdata=ValData)
+confCT <- confusionMatrix(ValData$classe,trainpred_CT)
+confCT$table
+confCT$overall[1]
+```
+
+The confusion matrix and the overall accuracy displayed above indicate the outcome 'classe' is not well predicted by the other variables using this model.
+
+## Model - Random Forest
+
+A Random Forest model is created with 5-fold cross-validation applied to assess how the model will perform when applied to additional data sets.
+
+```{r rfmod}
+TrainData$classe <- as.factor(TrainData$classe)
+rfControl <- trainControl(method="cv",number=5)
+Mod_RF <- train(classe~., data=TrainData, method="rf", trControl=rfControl,verbose=FALSE)
+Mod_RF$finalModel
+```
+
+This model shows an accuracy of 99.21 percent and an out-of-sample error rate of only 0.79 percent. An accuracy rate that high may indicate overfitting, despite the application of 5-fold cross-validation. The model is plotted.
+
+```{r plotrf}
+plot(Mod_RF,main="Figure 2: Random Forest Model Accuracy by Number of Predictors")
+```
+
+This shows the model's accuracy peaks at around 27 predictors, indicating more than half of the predictors are contributing to the model's accuracy. This helps explain the high accuracy rate.
+
+To assess how the Random Forest model performs against a completely different dataset, it is applied to the Validation Data and a confusion matrix is generated. 
+
+```{r predRF}
+trainpred_RF <- predict(Mod_RF,newdata=ValData)
+trainpred_RF
+confRF <- confusionMatrix(ValData$classe,trainpred_RF)
+confRF$table
+confRF$overall[1]
+```
+
+The confusion matrix is plotted.
+
+```{r plotconfRF}
+plot(confRF$table, col = confRF$byClass,main=paste("Figure 3: Random Forest Confusion Matrix"))
+```
+
+The confusion matrix table and the overall accuracy displayed above indicate this model is more than 99 percent accurate when applied to the validation data. Its accuracy is a bit lower against this new data, at 99.08 percent (vice 99.21 for the training data), with an out-of-sample error rate of 0.92 percent, but it remains a highly accurate model. 
+
+##Model - Generalized Boost Regression Model
+
+A Generalized Boost Regression Model is created with 5-fold cross-validation.
+
+```{r GBM}
+controlGBM <- trainControl(method="cv",number=5,repeats=1)
+Mod_GBM <- train(classe~.,data=TrainData,method="gbm",trControl=controlGBM,verbose=FALSE)
+Mod_GBM$finalModel
+Mod_GBM
+```
+
+The GMB model is applied to the Validation Data and a confusion matrix is generated. 
+
+```{r GBM_val}
+trainpred_GBM <- predict(Mod_GBM,newdata=ValData)
+confGBM <- confusionMatrix(ValData$classe,trainpred_GBM)
+confGBM
+```
+
+The GBM Model's overall accuracy was 0.9639, much higher than the Classification Tree but several percentage points lower than the Random Forest Model. 
+
+```{r GBM_plot}
+plot(Mod_GBM, main="Figure 4: GBM Model")
+```
+
+## Final Model Applied to Test Data
+
+The Random Forest model is superior to the others and will be applied to the test set.
+
+Before applying the final model to the test data, the columns in the test data must be set so they match the columns in the Training data set.
+
+```{r cleantest}
+common_cols <- intersect(colnames(testing), colnames(TrainData))
+TestData <- testing[, common_cols]
+testpred <- predict(Mod_RF,newdata=TestData)
+testpred
+```
+
+## Conclusion
+
+The Random Forest Model is superior to the other models for this data in terms of sensitivity, specificity, and positive and negative predictive values. Its out-of-sample rates are 99.08 percent for accuracy and 0.92 percent for error, making this an extremely accurate model.
